@@ -45,11 +45,10 @@ const App: React.FC = () => {
         fetchHistory(currentUser.id);
         const tier = currentUser.user_metadata?.tier as UserTier || UserTier.FREE;
         setUserTier(tier);
-        setShowAuthModal(false); // Close auth popup on successful login/signup
+        setShowAuthModal(false);
       } else {
         setHistory([]);
         setUserTier(UserTier.FREE);
-        setStatus(AppStatus.IDLE);
       }
     });
 
@@ -81,14 +80,7 @@ const App: React.FC = () => {
     e.preventDefault();
     if (!scenario.trim() && attachments.length === 0) return;
 
-    // Gated feature: require login before generating
-    if (!requireAuth()) return;
-
-    if (userTier === UserTier.FREE && history.length >= 2) {
-      setShowPricing(true);
-      return;
-    }
-
+    // Pro tier still requires key selection check
     if (userTier === UserTier.PRO) {
       // @ts-ignore
       const hasKey = await window.aistudio.hasSelectedApiKey();
@@ -101,30 +93,43 @@ const App: React.FC = () => {
     setStatus(AppStatus.LOADING);
     setError(null);
     try {
-      const data = await getComplianceReport(scenario || "Multimodal analysis requested.", userTier === UserTier.PRO, attachments);
+      const data = await getComplianceReport(scenario || "Business Strategy analysis.", userTier === UserTier.PRO, attachments);
       
-      const { data: inserted, error: dbError } = await supabase
-        .from('roadmaps')
-        .insert([{ 
-          user_id: user.id, 
-          scenario: scenario || "Multimodal Analysis", 
-          data 
-        }])
-        .select()
-        .single();
-      
-      if (dbError) throw dbError;
+      let finalItem: HistoryItem;
 
-      const newItem = { 
-        id: inserted.id, 
-        timestamp: Date.now(), 
-        scenario: scenario || "Multimodal Analysis", 
-        data, 
-        completedTasks: [] 
-      };
-      
-      setHistory(prev => [newItem, ...prev]);
-      setActiveReport(newItem);
+      if (user) {
+        const { data: inserted, error: dbError } = await supabase
+          .from('roadmaps')
+          .insert([{ 
+            user_id: user.id, 
+            scenario: scenario || "Strategy Analysis", 
+            data 
+          }])
+          .select()
+          .single();
+        
+        if (dbError) throw dbError;
+
+        finalItem = { 
+          id: inserted.id, 
+          timestamp: Date.now(), 
+          scenario: scenario || "Strategy Analysis", 
+          data, 
+          completedTasks: [] 
+        };
+        setHistory(prev => [finalItem, ...prev]);
+      } else {
+        // Guest mode generation
+        finalItem = {
+          id: 'temp-' + Date.now(),
+          timestamp: Date.now(),
+          scenario: scenario || "Guest Analysis",
+          data,
+          completedTasks: []
+        };
+      }
+
+      setActiveReport(finalItem);
       setStatus(AppStatus.SUCCESS);
       setAttachments([]); 
     } catch (err: any) {
@@ -189,8 +194,11 @@ const App: React.FC = () => {
     
     const updated = { ...activeReport, completedTasks: newTasks };
     setActiveReport(updated);
-    setHistory(prev => prev.map(i => i.id === updated.id ? updated : i));
-    await supabase.from('roadmaps').update({ completed_tasks: newTasks }).eq('id', activeReport.id);
+    
+    if (user && !activeReport.id.startsWith('temp-')) {
+      setHistory(prev => prev.map(i => i.id === updated.id ? updated : i));
+      await supabase.from('roadmaps').update({ completed_tasks: newTasks }).eq('id', activeReport.id);
+    }
   };
 
   return (
@@ -228,15 +236,15 @@ const App: React.FC = () => {
       {status === AppStatus.IDLE && (
         <div className="flex-grow flex flex-col items-center justify-center p-6 text-center max-w-4xl mx-auto">
           <div className="mb-10 animate-in slide-in-from-top-4 duration-700">
-            <h2 className="text-5xl font-black text-[#003078] mb-4 tracking-tight leading-tight">Regulatory Intelligence for India</h2>
-            <p className="text-slate-500 font-medium text-lg max-w-2xl mx-auto">Instant roadmaps for startups, financial services, and complex business models.</p>
+            <h2 className="text-5xl font-black text-[#003078] mb-4 tracking-tight leading-tight">Universal Business Strategy for India</h2>
+            <p className="text-slate-500 font-medium text-lg max-w-2xl mx-auto">From tea stalls to tech unicorns. Get instant regulatory & operational roadmaps.</p>
           </div>
           
           <div className="w-full max-w-2xl bg-white p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 relative group transition-all hover:shadow-3xl">
             <form onSubmit={handleGenerate}>
               <textarea 
                 className="w-full h-40 p-6 bg-slate-50 border border-slate-200 rounded-t-2xl focus:outline-none text-slate-700 font-medium placeholder:text-slate-300 resize-none transition-all"
-                placeholder="Describe your project (e.g. Starting an NBFC in Bengaluru)..."
+                placeholder="Describe your business idea (e.g. 'Opening a specialized organic tea bar in Pune' or 'Structuring an AI SaaS with global clients')..."
                 value={scenario}
                 onChange={(e) => setScenario(e.target.value)}
               />
@@ -273,7 +281,7 @@ const App: React.FC = () => {
                 </div>
                 
                 <button className="gradient-bg text-white font-black px-8 py-3 rounded-xl shadow-lg hover:opacity-95 transition-all text-sm flex items-center justify-center gap-2 group/btn">
-                  Generate Roadmap
+                  Build Protocol
                   <svg className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                 </button>
               </div>
@@ -300,15 +308,15 @@ const App: React.FC = () => {
               )}
             </form>
             <p className="mt-6 text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center">
-              Powered by Gemini 3 {userTier === UserTier.PRO ? "Pro" : "Flash"}
+              Unlimited High-Speed Reasoning {userTier === UserTier.PRO ? "(Pro Mode)" : ""}
             </p>
           </div>
 
           <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6 text-left w-full max-w-4xl animate-in fade-in duration-1000 delay-300">
              {[
-               { icon: "📄", title: "Smart Analysis", desc: "Upload licenses or registrations for instant breakdown." },
-               { icon: "🛡️", title: "Risk Mitigation", desc: "Identify liability points and required filings automatically." },
-               { icon: "☁️", title: "The Vault", desc: "Sign in to save and track your compliance journey." }
+               { icon: "🏪", title: "Micro-Business Support", desc: "Detailed steps for shops, stalls, and solo-ventures." },
+               { icon: "🛡️", title: "Risk Mitigation", desc: "Identify tax liabilities and licensing hurdles instantly." },
+               { icon: "✨", title: "Unlimited Thinking", desc: "No tokens limits or generation caps on the Free tier." }
              ].map((f, i) => (
                <div key={i} className="p-6 rounded-2xl border border-slate-100 bg-white/50 hover:bg-white hover:shadow-md transition-all">
                  <span className="text-2xl mb-2 block">{f.icon}</span>
@@ -329,8 +337,8 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="text-center">
-            <p className="font-black text-[#003078] text-2xl animate-pulse tracking-tight">Constructing Intelligence...</p>
-            <p className="text-slate-400 font-medium text-sm mt-2">Merging Multi-modal Inputs with Regulatory Grids</p>
+            <p className="font-black text-[#003078] text-2xl animate-pulse tracking-tight">Synthesizing Strategy...</p>
+            <p className="text-slate-400 font-medium text-sm mt-2">Connecting Local State Laws & Regulatory Grids</p>
           </div>
         </div>
       )}
@@ -352,12 +360,20 @@ const App: React.FC = () => {
       )}
 
       {status === AppStatus.SUCCESS && activeReport && (
-        <ComplianceReport 
-          data={activeReport.data} 
-          completedTaskIds={activeReport.completedTasks} 
-          onToggleTask={handleToggleTask}
-          isPro={userTier === UserTier.PRO}
-        />
+        <div className="flex-grow relative">
+          {!user && (
+             <div className="bg-[#003078] text-white p-3 text-center text-xs font-bold animate-in slide-in-from-top duration-500 flex items-center justify-center gap-4">
+                <span>Sign in to save this roadmap to your Vault and track progress permanently.</span>
+                <button onClick={() => setShowAuthModal(true)} className="bg-white text-[#003078] px-4 py-1 rounded-full uppercase tracking-widest font-black">Secure Vault</button>
+             </div>
+          )}
+          <ComplianceReport 
+            data={activeReport.data} 
+            completedTaskIds={activeReport.completedTasks} 
+            onToggleTask={handleToggleTask}
+            isPro={userTier === UserTier.PRO}
+          />
+        </div>
       )}
 
       {showHistory && (

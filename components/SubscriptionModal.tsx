@@ -15,17 +15,17 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ onClose, o
           <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-6 shadow-sm">
             💎
           </div>
-          <h2 className="text-3xl font-black text-slate-900 mb-2">Upgrade to ReguFlow Pro</h2>
+          <h2 className="text-3xl font-black text-slate-900 mb-2">Upgrade to Pro</h2>
           <p className="text-slate-500 font-medium mb-10">
-            Unlock professional tools to manage your Indian compliance at scale.
+            The Free tier is unlimited, but Pro offers verified intelligence.
           </p>
 
           <div className="space-y-4 mb-8 text-left">
             {[
-              { title: "Google Search Grounding", desc: "AI consults live ministry circulars", icon: "🌐" },
-              { title: "Unlimited Vault Storage", desc: "Store all your client roadmaps", icon: "📦" },
-              { title: "Gemini 3 Pro Engine", desc: "Advanced reasoning for complex entities", icon: "🧠" },
-              { title: "Direct Expert Connect", desc: "Lead matching with verified CAs", icon: "🤝" }
+              { title: "Google Search Grounding", desc: "Verifies latest laws with live web search", icon: "🌐" },
+              { title: "Advanced Reasoning", desc: "Powered by Gemini 3 Pro engine", icon: "🧠" },
+              { title: "Vault Backup", desc: "Priority storage for high-volume roadmaps", icon: "📦" },
+              { title: "Expert Lead Matching", desc: "Connect directly with verified Indian CAs", icon: "🤝" }
             ].map((feature, i) => (
               <div key={i} className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
                 <span className="text-xl">{feature.icon}</span>
@@ -47,25 +47,18 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ onClose, o
             </div>
           </div>
 
-          <div className="mb-8 p-4 bg-blue-50 rounded-2xl border border-blue-100">
-            <p className="text-[11px] text-blue-700 font-bold leading-relaxed">
-              Note: Pro features require selecting an API key from a paid GCP project. 
-              <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="underline ml-1">View Billing Docs</a>
-            </p>
-          </div>
-
           <button 
             onClick={onUpgrade}
             className="w-full gradient-bg text-white font-black py-4 rounded-2xl shadow-xl hover:opacity-95 transition-all mb-4 text-lg"
           >
-            Upgrade & Select Key
+            Upgrade & Activate Pro
           </button>
           
           <button 
             onClick={onClose}
             className="text-slate-400 font-bold text-sm hover:text-slate-600 transition-colors"
           >
-            Not now, maybe later
+            Stay on Free (Unlimited)
           </button>
         </div>
       </div>
