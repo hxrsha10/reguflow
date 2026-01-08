@@ -1,11 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ComplianceData } from '../types';
 
 interface ComplianceReportProps {
   data: ComplianceData;
   completedTaskIds: string[];
   onToggleTask: (taskId: string) => void;
+  isPro?: boolean;
 }
 
 const Card: React.FC<{ title: string; icon: string; bgColor: string; iconColor: string; children: React.ReactNode; className?: string }> = ({ title, icon, bgColor, iconColor, children, className = "" }) => (
@@ -23,7 +24,8 @@ const Card: React.FC<{ title: string; icon: string; bgColor: string; iconColor: 
   </div>
 );
 
-export const ComplianceReport: React.FC<ComplianceReportProps> = ({ data, completedTaskIds, onToggleTask }) => {
+export const ComplianceReport: React.FC<ComplianceReportProps> = ({ data, completedTaskIds, onToggleTask, isPro = false }) => {
+  const [showExpertModal, setShowExpertModal] = useState(false);
   const totalTasks = data.actionableTaskChecklist.length;
   const progressPercentage = Math.round((completedTaskIds.length / totalTasks) * 100);
 
@@ -31,14 +33,40 @@ export const ComplianceReport: React.FC<ComplianceReportProps> = ({ data, comple
     window.print();
   };
 
+  const handleExpertSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    alert("Lead Recorded! A specialist from our CA network will review your protocol and contact you within 24 hours.");
+    setShowExpertModal(false);
+  };
+
   return (
-    <div className="max-w-7xl mx-auto py-12 px-6 w-full animate-in fade-in duration-700 print:py-0 print:px-0">
+    <div className="max-w-7xl mx-auto py-12 px-6 w-full animate-in fade-in duration-700 print:py-0 print:px-0 relative">
+      {/* Expert Lead Modal */}
+      {showExpertModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 print:hidden">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowExpertModal(false)}></div>
+          <div className="relative w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 p-10">
+            <h3 className="text-2xl font-black text-slate-900 mb-2">Expert Review</h3>
+            <p className="text-slate-500 font-medium mb-8">Share this roadmap with a verified professional for a formal validation.</p>
+            <form onSubmit={handleExpertSubmit} className="space-y-4">
+              <input type="text" placeholder="Your Phone Number" required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 focus:outline-none" />
+              <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 focus:outline-none">
+                <option>Chartered Accountant (CA)</option>
+                <option>Company Secretary (CS)</option>
+                <option>Legal Counsel</option>
+              </select>
+              <button className="w-full gradient-bg text-white font-black py-4 rounded-xl shadow-lg mt-4">Submit Request</button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Header & Progress */}
       <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-8 print:mb-6">
         <div className="max-w-2xl">
           <div className="flex items-center gap-2 mb-2 text-[#1d70b8] font-bold uppercase tracking-widest text-xs">
             <span className="w-2 h-2 rounded-full bg-[#1d70b8] animate-pulse print:hidden"></span>
-            Compliance Roadmap
+            Compliance Roadmap {data.isGrounded && <span className="ml-2 bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px]">Grounded with Google Search</span>}
           </div>
           <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-4">
             Operational Protocol
@@ -49,13 +77,22 @@ export const ComplianceReport: React.FC<ComplianceReportProps> = ({ data, comple
         </div>
         
         <div className="flex flex-col gap-4">
-          <button 
-            onClick={handlePrint}
-            className="gradient-bg text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 print:hidden"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-            Export as PDF
-          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={handlePrint}
+              className="bg-slate-100 text-slate-700 px-6 py-3 rounded-xl font-bold text-sm shadow-sm hover:bg-slate-200 transition-all flex items-center justify-center gap-2 print:hidden"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+              Print
+            </button>
+            <button 
+              onClick={() => setShowExpertModal(true)}
+              className="gradient-bg text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 print:hidden"
+            >
+              <span className="text-lg">🤝</span>
+              Hire an Expert
+            </button>
+          </div>
           
           <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl min-w-[280px] print:hidden">
             <div className="flex justify-between items-center mb-3">
@@ -124,6 +161,25 @@ export const ComplianceReport: React.FC<ComplianceReportProps> = ({ data, comple
               ))}
             </div>
           </Card>
+
+          {data.groundingSources && data.groundingSources.length > 0 && (
+            <Card title="Grounded Sources" icon="🌐" bgColor="bg-indigo-50" iconColor="text-indigo-600">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {data.groundingSources.map((source, i) => (
+                  <a 
+                    key={i} 
+                    href={source.uri} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex flex-col p-3 bg-white rounded-xl border border-slate-100 hover:border-indigo-300 transition-colors group"
+                  >
+                    <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Source {i+1}</span>
+                    <span className="text-xs font-bold text-slate-700 line-clamp-1 group-hover:text-indigo-600 transition-colors">{source.title}</span>
+                  </a>
+                ))}
+              </div>
+            </Card>
+          )}
         </div>
 
         {/* Sidebar Column */}

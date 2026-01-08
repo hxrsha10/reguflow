@@ -17,6 +17,8 @@ export interface ComplianceData {
   deadlinesFrequency: string[];
   riskFlags: string[];
   monitoringSuggestions: string[];
+  isGrounded?: boolean;
+  groundingSources?: Array<{ title: string; uri: string }>;
 }
 
 export interface HistoryItem {
@@ -25,6 +27,11 @@ export interface HistoryItem {
   scenario: string;
   data: ComplianceData;
   completedTasks: string[];
+}
+
+export enum UserTier {
+  FREE = 'FREE',
+  PRO = 'PRO'
 }
 
 export enum AppStatus {
