@@ -1,5 +1,7 @@
 {
   "name": "ReguFlow",
   "description": "A specialized tool for transforming complex Indian regulatory requirements into actionable workflows, checklists, and documentation guides.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "camera"
+  ]
 }

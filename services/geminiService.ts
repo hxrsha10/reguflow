@@ -6,6 +6,7 @@ const SYSTEM_INSTRUCTION = `
 Role: Compliance & Risk Workflow Assistant (India)
 Purpose: Convert complex Indian regulations into clear operational tasks and checklists.
 Tone: Professional, neutral, helpful. NO legal advice.
+Multi-modal capability: You may be provided with images or documents. Analyze them for regulatory context (e.g., a specific license, a business premises photo, or a registration form) and incorporate them into the checklist.
 Important: You MUST return a valid JSON object matching the requested schema. 
 If using Google Search grounding, ensure the links provided are specific to Indian ministries (MCA, GSTN, RBI, SEBI).
 Do not include any text outside the JSON block.
@@ -39,9 +40,19 @@ const responseSchema = {
   required: ["applicableRegulations", "complianceObligations", "actionableTaskChecklist", "requiredDocuments", "deadlinesFrequency", "riskFlags", "monitoringSuggestions"]
 };
 
-export const getComplianceReport = async (scenario: string, isPro: boolean = false): Promise<ComplianceData> => {
+export interface Attachment {
+  data: string; // base64
+  mimeType: string;
+}
+
+export const getComplianceReport = async (
+  scenario: string, 
+  isPro: boolean = false, 
+  attachments: Attachment[] = []
+): Promise<ComplianceData> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-  
+  const modelName = isPro ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
+
   const config: any = {
     systemInstruction: SYSTEM_INSTRUCTION,
     responseMimeType: "application/json",
@@ -53,9 +64,19 @@ export const getComplianceReport = async (scenario: string, isPro: boolean = fal
     config.tools = [{ googleSearch: {} }];
   }
 
+  const parts: any[] = [{ text: scenario }];
+  attachments.forEach(att => {
+    parts.push({
+      inlineData: {
+        data: att.data,
+        mimeType: att.mimeType
+      }
+    });
+  });
+
   const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: scenario,
+    model: modelName,
+    contents: { parts },
     config: config,
   });
 
@@ -64,12 +85,11 @@ export const getComplianceReport = async (scenario: string, isPro: boolean = fal
   
   let parsed: ComplianceData;
   try {
-    // Clean potential markdown blocks if JSON mode is slightly conversational
     const cleanJson = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
     parsed = JSON.parse(cleanJson) as ComplianceData;
   } catch (e) {
     console.error("JSON Parsing Error:", textOutput);
-    throw new Error("The AI returned an invalid format. This usually happens with very complex scenarios. Please try simplifying your input.");
+    throw new Error("Formatting error. Please simplify your scenario.");
   }
   
   if (isPro && response.candidates?.[0]?.groundingMetadata?.groundingChunks) {

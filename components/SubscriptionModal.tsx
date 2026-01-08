@@ -20,12 +20,12 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ onClose, o
             Unlock professional tools to manage your Indian compliance at scale.
           </p>
 
-          <div className="space-y-4 mb-10 text-left">
+          <div className="space-y-4 mb-8 text-left">
             {[
               { title: "Google Search Grounding", desc: "AI consults live ministry circulars", icon: "🌐" },
               { title: "Unlimited Vault Storage", desc: "Store all your client roadmaps", icon: "📦" },
-              { title: "Priority Export Formatting", desc: "Ready for board meetings", icon: "📄" },
-              { title: "Direct CA/CS Connect", desc: "Priority matching with experts", icon: "🤝" }
+              { title: "Gemini 3 Pro Engine", desc: "Advanced reasoning for complex entities", icon: "🧠" },
+              { title: "Direct Expert Connect", desc: "Lead matching with verified CAs", icon: "🤝" }
             ].map((feature, i) => (
               <div key={i} className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
                 <span className="text-xl">{feature.icon}</span>
@@ -47,11 +47,18 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ onClose, o
             </div>
           </div>
 
+          <div className="mb-8 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+            <p className="text-[11px] text-blue-700 font-bold leading-relaxed">
+              Note: Pro features require selecting an API key from a paid GCP project. 
+              <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="underline ml-1">View Billing Docs</a>
+            </p>
+          </div>
+
           <button 
             onClick={onUpgrade}
             className="w-full gradient-bg text-white font-black py-4 rounded-2xl shadow-xl hover:opacity-95 transition-all mb-4 text-lg"
           >
-            Start Free Trial
+            Upgrade & Select Key
           </button>
           
           <button 
