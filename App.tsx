@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getComplianceReport, Attachment } from './services/geminiService';
 import { ComplianceData, AppStatus, HistoryItem, UserTier } from './types';
 import { ComplianceReport } from './components/ComplianceReport';
-import { Auth } from './components/Auth';
 import { AuthModal } from './components/AuthModal';
 import { LegalOverlay } from './components/LegalOverlay';
 import { Logo } from './components/Logo';
@@ -30,23 +29,27 @@ const App: React.FC = () => {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchHistory(session.user.id);
-        const tier = session.user.user_metadata?.tier as UserTier || UserTier.FREE;
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        fetchHistory(currentUser.id);
+        const tier = currentUser.user_metadata?.tier as UserTier || UserTier.FREE;
         setUserTier(tier);
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchHistory(session.user.id);
-        const tier = session.user.user_metadata?.tier as UserTier || UserTier.FREE;
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        fetchHistory(currentUser.id);
+        const tier = currentUser.user_metadata?.tier as UserTier || UserTier.FREE;
         setUserTier(tier);
+        setShowAuthModal(false); // Close auth popup on successful login/signup
       } else {
         setHistory([]);
         setUserTier(UserTier.FREE);
+        setStatus(AppStatus.IDLE);
       }
     });
 
@@ -66,7 +69,7 @@ const App: React.FC = () => {
     }
   };
 
-  const checkAuth = (actionName: string): boolean => {
+  const requireAuth = (): boolean => {
     if (!user) {
       setShowAuthModal(true);
       return false;
@@ -78,11 +81,8 @@ const App: React.FC = () => {
     e.preventDefault();
     if (!scenario.trim() && attachments.length === 0) return;
 
-    // Gatekeeping storage for guests
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
+    // Gated feature: require login before generating
+    if (!requireAuth()) return;
 
     if (userTier === UserTier.FREE && history.length >= 2) {
       setShowPricing(true);
@@ -101,20 +101,32 @@ const App: React.FC = () => {
     setStatus(AppStatus.LOADING);
     setError(null);
     try {
-      const data = await getComplianceReport(scenario || "Document analysis requested.", userTier === UserTier.PRO, attachments);
+      const data = await getComplianceReport(scenario || "Multimodal analysis requested.", userTier === UserTier.PRO, attachments);
+      
       const { data: inserted, error: dbError } = await supabase
         .from('roadmaps')
-        .insert([{ user_id: user.id, scenario: scenario || "Multimodal Analysis", data }])
+        .insert([{ 
+          user_id: user.id, 
+          scenario: scenario || "Multimodal Analysis", 
+          data 
+        }])
         .select()
         .single();
       
       if (dbError) throw dbError;
 
-      const newItem = { id: inserted.id, timestamp: Date.now(), scenario: scenario || "Multimodal Analysis", data, completedTasks: [] };
+      const newItem = { 
+        id: inserted.id, 
+        timestamp: Date.now(), 
+        scenario: scenario || "Multimodal Analysis", 
+        data, 
+        completedTasks: [] 
+      };
+      
       setHistory(prev => [newItem, ...prev]);
       setActiveReport(newItem);
       setStatus(AppStatus.SUCCESS);
-      setAttachments([]); // Clear after success
+      setAttachments([]); 
     } catch (err: any) {
       console.error("Generation Error:", err);
       if (err.message?.includes("Requested entity was not found")) {
@@ -130,10 +142,9 @@ const App: React.FC = () => {
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!checkAuth("upload files")) return;
+    if (!requireAuth()) return;
     const files = e.target.files;
     if (files) {
-      const newAttachments: Attachment[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const reader = new FileReader();
@@ -155,6 +166,7 @@ const App: React.FC = () => {
   };
 
   const handleUpgrade = async () => {
+    if (!requireAuth()) return;
     try {
       // @ts-ignore
       await window.aistudio.openSelectKey();
@@ -208,7 +220,7 @@ const App: React.FC = () => {
               <button onClick={() => supabase.auth.signOut()} className="text-rose-500 font-bold text-sm hover:text-rose-600">Logout</button>
             </>
           ) : (
-            <button onClick={() => setShowAuthModal(true)} className="text-[#1d70b8] font-black text-sm uppercase tracking-widest">Sign In</button>
+            <button onClick={() => setShowAuthModal(true)} className="bg-[#1d70b8] text-white px-5 py-2 rounded-full font-black text-xs uppercase tracking-widest hover:bg-[#003078] transition-all shadow-md">Sign In</button>
           )}
         </div>
       </nav>
@@ -224,17 +236,18 @@ const App: React.FC = () => {
             <form onSubmit={handleGenerate}>
               <textarea 
                 className="w-full h-40 p-6 bg-slate-50 border border-slate-200 rounded-t-2xl focus:outline-none text-slate-700 font-medium placeholder:text-slate-300 resize-none transition-all"
-                placeholder="Describe your project or upload documents for analysis..."
+                placeholder="Describe your project (e.g. Starting an NBFC in Bengaluru)..."
                 value={scenario}
                 onChange={(e) => setScenario(e.target.value)}
               />
               
-              {/* Attachments Toolbar */}
               <div className="bg-slate-50 border-x border-b border-slate-200 rounded-b-2xl p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <button 
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => {
+                      if (requireAuth()) fileInputRef.current?.click();
+                    }}
                     className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-[#1d70b8] hover:border-[#1d70b8] transition-all"
                     title="Upload Files"
                   >
@@ -243,7 +256,7 @@ const App: React.FC = () => {
                   <button 
                     type="button"
                     onClick={() => {
-                      if (checkAuth("use camera")) setShowCamera(true);
+                      if (requireAuth()) setShowCamera(true);
                     }}
                     className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-[#1d70b8] hover:border-[#1d70b8] transition-all"
                     title="Capture Photo"
@@ -260,12 +273,11 @@ const App: React.FC = () => {
                 </div>
                 
                 <button className="gradient-bg text-white font-black px-8 py-3 rounded-xl shadow-lg hover:opacity-95 transition-all text-sm flex items-center justify-center gap-2 group/btn">
-                  Construct Protocol
+                  Generate Roadmap
                   <svg className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                 </button>
               </div>
 
-              {/* Attachment Previews */}
               {attachments.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-3 animate-in fade-in slide-in-from-top-2">
                   {attachments.map((att, i) => (
@@ -288,15 +300,15 @@ const App: React.FC = () => {
               )}
             </form>
             <p className="mt-6 text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center">
-              {userTier === UserTier.PRO ? "Gemini 3 Pro Multimodal Activated" : "Gemini 3 Flash Vision Active"}
+              Powered by Gemini 3 {userTier === UserTier.PRO ? "Pro" : "Flash"}
             </p>
           </div>
 
           <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6 text-left w-full max-w-4xl animate-in fade-in duration-1000 delay-300">
              {[
-               { icon: "📄", title: "Document Review", desc: "Upload licenses or notices for instant regulatory breakdown." },
-               { icon: "📸", title: "Visual Context", desc: "Snap photos of business setups for compliance checks." },
-               { icon: "📜", title: "Compliant Frameworks", desc: "GST, RBI, MCA & FEMA alignment." }
+               { icon: "📄", title: "Smart Analysis", desc: "Upload licenses or registrations for instant breakdown." },
+               { icon: "🛡️", title: "Risk Mitigation", desc: "Identify liability points and required filings automatically." },
+               { icon: "☁️", title: "The Vault", desc: "Sign in to save and track your compliance journey." }
              ].map((f, i) => (
                <div key={i} className="p-6 rounded-2xl border border-slate-100 bg-white/50 hover:bg-white hover:shadow-md transition-all">
                  <span className="text-2xl mb-2 block">{f.icon}</span>
@@ -317,8 +329,8 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="text-center">
-            <p className="font-black text-[#003078] text-2xl animate-pulse tracking-tight">Processing Intelligence...</p>
-            <p className="text-slate-400 font-medium text-sm mt-2">Merging Vision & Regulatory Grids</p>
+            <p className="font-black text-[#003078] text-2xl animate-pulse tracking-tight">Constructing Intelligence...</p>
+            <p className="text-slate-400 font-medium text-sm mt-2">Merging Multi-modal Inputs with Regulatory Grids</p>
           </div>
         </div>
       )}

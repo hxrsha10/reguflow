@@ -48,98 +48,92 @@ export const Auth: React.FC<AuthProps> = ({ onShowLegal }) => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-6 grid-bg">
-      <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="text-center mb-10">
-          <Logo className="w-24 h-24 mx-auto mb-4" />
-          <h1 className="text-3xl font-extrabold text-[#003078] tracking-tight mb-2 uppercase">
-            REGUFLOW
-          </h1>
-          <p className="text-slate-500 font-medium">Simplify your Indian Compliance Journey</p>
+    <div className="w-full bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="p-8 pb-4 text-center border-b border-slate-50">
+        <Logo className="w-12 h-12 mx-auto mb-2" hideText />
+        <h2 className="text-xl font-black text-[#003078] tracking-tight uppercase">ReguFlow</h2>
+        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Gated Regulatory Access</p>
+      </div>
+
+      <div className="flex border-b border-slate-100 bg-slate-50/50">
+        <button 
+          onClick={() => setIsLogin(true)}
+          className={`flex-1 py-4 text-[10px] font-black tracking-widest uppercase transition-all ${isLogin ? 'bg-white text-[#003078] border-b-2 border-[#1d70b8]' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          Sign In
+        </button>
+        <button 
+          onClick={() => setIsLogin(false)}
+          className={`flex-1 py-4 text-[10px] font-black tracking-widest uppercase transition-all ${!isLogin ? 'bg-white text-[#003078] border-b-2 border-[#1d70b8]' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          Sign Up
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="p-8 space-y-4">
+        {error && (
+          <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 text-[10px] font-bold leading-tight animate-in shake duration-300">
+            {error}
+          </div>
+        )}
+
+        {!isLogin && (
+          <div className="space-y-1">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
+            <input 
+              type="text" 
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-all placeholder:text-slate-300"
+              placeholder="Rahul Sharma"
+            />
+          </div>
+        )}
+
+        <div className="space-y-1">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
+          <input 
+            type="email" 
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-all placeholder:text-slate-300"
+            placeholder="rahul@example.com"
+          />
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
-          <div className="flex border-b border-slate-100">
-            <button 
-              onClick={() => setIsLogin(true)}
-              className={`flex-1 py-5 text-sm font-bold tracking-widest uppercase transition-all ${isLogin ? 'bg-slate-50 text-[#003078] border-b-2 border-[#1d70b8]' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Sign In
-            </button>
-            <button 
-              onClick={() => setIsLogin(false)}
-              className={`flex-1 py-5 text-sm font-bold tracking-widest uppercase transition-all ${!isLogin ? 'bg-slate-50 text-[#003078] border-b-2 border-[#1d70b8]' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Sign Up
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-8 space-y-5">
-            {error && (
-              <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 text-xs font-bold leading-relaxed animate-in fade-in zoom-in duration-200">
-                {error}
-              </div>
-            )}
-
-            {!isLogin && (
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Full Name</label>
-                <input 
-                  type="text" 
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 text-black focus:outline-none transition-all placeholder:text-slate-400 font-medium"
-                  placeholder="Rahul Sharma"
-                />
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Email Address</label>
-              <input 
-                type="email" 
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 text-black focus:outline-none transition-all placeholder:text-slate-400 font-medium"
-                placeholder="rahul@example.com"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Password</label>
-              <input 
-                type="password" 
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 text-black focus:outline-none transition-all placeholder:text-slate-400 font-medium"
-                placeholder="••••••••"
-              />
-            </div>
-
-            <button 
-              disabled={loading}
-              className="w-full gradient-bg hover:opacity-90 active:scale-[0.98] text-white font-bold py-4 rounded-xl shadow-lg transition-all mt-4 flex items-center justify-center gap-3 text-lg disabled:opacity-50"
-            >
-              {loading ? (
-                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : (
-                isLogin ? 'Login' : 'Create Account'
-              )}
-            </button>
-          </form>
-
-          <div className="px-8 pb-8 text-center">
-            <p className="text-xs text-slate-400 font-medium leading-relaxed">
-              By continuing, you agree to our{' '}
-              <button onClick={() => onShowLegal('terms')} className="text-[#1d70b8] hover:underline font-bold">Terms</button>
-              {' '}and{' '}
-              <button onClick={() => onShowLegal('privacy')} className="text-[#1d70b8] hover:underline font-bold">Privacy Policy</button>.
-            </p>
-          </div>
+        <div className="space-y-1">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
+          <input 
+            type="password" 
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-all placeholder:text-slate-300"
+            placeholder="••••••••"
+          />
         </div>
+
+        <button 
+          disabled={loading}
+          className="w-full gradient-bg hover:opacity-90 active:scale-[0.98] text-white font-black py-3.5 rounded-xl shadow-lg transition-all mt-4 flex items-center justify-center gap-3 text-sm disabled:opacity-50"
+        >
+          {loading ? (
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+          ) : (
+            isLogin ? 'Sign In' : 'Create Account'
+          )}
+        </button>
+      </form>
+
+      <div className="px-8 pb-8 text-center">
+        <p className="text-[9px] text-slate-400 font-bold leading-relaxed uppercase tracking-tighter">
+          By continuing, you agree to our{' '}
+          <button onClick={() => onShowLegal('terms')} className="text-[#1d70b8] hover:underline">Terms</button>
+          {' '}and{' '}
+          <button onClick={() => onShowLegal('privacy')} className="text-[#1d70b8] hover:underline">Privacy</button>
+        </p>
       </div>
     </div>
   );
