@@ -3,17 +3,18 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ComplianceData } from "../types";
 
 const SYSTEM_INSTRUCTION = `
-Role: Global Business Strategist & Compliance Architect (India)
-Purpose: Transform ANY business query into a high-fidelity roadmap. 
+Role: Universal Business Strategist & Compliance Architect (India)
+Expertise: Comprehensive knowledge of Indian Central and State laws (Shop & Establishment, GST, MCA, RBI, MSME, FEMA, Labor Laws, Food Safety/FSSAI, etc.).
 
-Personalization Rule: You will be provided with "User Context/History". If the current query relates to previous searches, improve your response by building upon past context (e.g., comparing cities, scaling existing models).
+Core Mission:
+1. Universal Scope: Answer EVERY business-related question. No query is too small (e.g., 'How to open a cigarette stall legally in Mumbai') or too large (e.g., 'Drafting a multi-state holding structure for a fintech conglomerate').
+2. Personalized Intelligence (Memory): You are provided with 'Recent Context'. Use this history to provide continuity. If the user previously asked about a startup in Delhi and now asks about scaling to Bangalore, your response must acknowledge the transition and compare regulations.
+3. Tier-Specific Detail:
+   - FREE: High-quality actionable roadmaps.
+   - PRO: Enhanced grounding with live updates and professional depth.
+   - PREMIUM: Maximum depth. Include specific section numbers of Indian Acts, audit-readiness checklists, and liability mitigation strategies.
 
-Scope: 
-- Minor: Home-based businesses, micro-consultancies, small retail.
-- Major: Unicorn startups, NBFCs, cross-border e-commerce, manufacturing.
-- Premium Features: If tier is PREMIUM, provide 50% more detail in 'riskFlags' and 'monitoringSuggestions', including specific section numbers of Indian Acts.
-
-Output: Valid JSON only.
+Strict Format: Return ONLY a JSON object. No conversational filler.
 `;
 
 const responseSchema = {
@@ -59,25 +60,26 @@ export const getComplianceReport = async (
   const isPro = tier === 'PRO' || tier === 'PREMIUM';
   const isPremium = tier === 'PREMIUM';
   
-  // Use pro model for paid tiers, flash for free
+  // Use pro model for paid tiers to provide superior intelligence
   const modelName = isPro ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
 
-  const contextPrompt = history.length > 0 
-    ? `USER HISTORY CONTEXT: ${history.join(" | ")}. CURRENT QUERY: ${scenario}.`
+  // Construct context-aware prompt
+  const contextBlock = history.length > 0 
+    ? `USER INTERACTION HISTORY:\n${history.map((q, i) => `${i+1}. ${q}`).join('\n')}\n\nNEW QUERY: ${scenario}`
     : scenario;
 
   const config: any = {
-    systemInstruction: `${SYSTEM_INSTRUCTION}\nUser Tier: ${tier}\n${isPremium ? 'PROVIDE MAXIMUM DETAIL FOR PREMIUM USER.' : ''}`,
+    systemInstruction: `${SYSTEM_INSTRUCTION}\nACTIVE_TIER: ${tier}`,
     responseMimeType: "application/json",
     responseSchema: responseSchema,
-    temperature: 0.2
+    temperature: 0.25, // Slightly more creative for 'Strategy' while maintaining JSON strictness
   };
 
   if (isPro) {
     config.tools = [{ googleSearch: {} }];
   }
 
-  const parts: any[] = [{ text: contextPrompt }];
+  const parts: any[] = [{ text: contextBlock }];
   attachments.forEach(att => {
     parts.push({
       inlineData: {
@@ -101,7 +103,7 @@ export const getComplianceReport = async (
     const cleanJson = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
     parsed = JSON.parse(cleanJson) as ComplianceData;
   } catch (e) {
-    throw new Error("Formatting error. AI response could not be parsed.");
+    throw new Error("AI intelligence formatting error. Please refine your query.");
   }
   
   if (isPro && response.candidates?.[0]?.groundingMetadata?.groundingChunks) {
