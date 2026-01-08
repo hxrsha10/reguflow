@@ -8,6 +8,7 @@ import { LegalOverlay } from './components/LegalOverlay';
 import { Logo } from './components/Logo';
 import { SubscriptionModal } from './components/SubscriptionModal';
 import { CameraCapture } from './components/CameraCapture';
+import { PaymentGateway } from './components/PaymentGateway';
 import { supabase } from './services/supabaseClient';
 
 const App: React.FC = () => {
@@ -23,6 +24,7 @@ const App: React.FC = () => {
   const [showPricing, setShowPricing] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [showPayment, setShowPayment] = useState<{plan: UserTier, amount: string} | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -80,8 +82,7 @@ const App: React.FC = () => {
     e.preventDefault();
     if (!scenario.trim() && attachments.length === 0) return;
 
-    // Pro tier still requires key selection check
-    if (userTier === UserTier.PRO) {
+    if (userTier !== UserTier.FREE) {
       // @ts-ignore
       const hasKey = await window.aistudio.hasSelectedApiKey();
       if (!hasKey) {
@@ -93,96 +94,58 @@ const App: React.FC = () => {
     setStatus(AppStatus.LOADING);
     setError(null);
     try {
-      const data = await getComplianceReport(scenario || "Business Strategy analysis.", userTier === UserTier.PRO, attachments);
+      // Extract interaction history for memory
+      const recentQueries = history.slice(0, 3).map(h => h.scenario);
+      const data = await getComplianceReport(scenario || "Business Strategy analysis.", userTier, attachments, recentQueries);
       
       let finalItem: HistoryItem;
-
       if (user) {
         const { data: inserted, error: dbError } = await supabase
           .from('roadmaps')
-          .insert([{ 
-            user_id: user.id, 
-            scenario: scenario || "Strategy Analysis", 
-            data 
-          }])
+          .insert([{ user_id: user.id, scenario: scenario || "Strategy Analysis", data }])
           .select()
           .single();
-        
         if (dbError) throw dbError;
-
-        finalItem = { 
-          id: inserted.id, 
-          timestamp: Date.now(), 
-          scenario: scenario || "Strategy Analysis", 
-          data, 
-          completedTasks: [] 
-        };
+        finalItem = { id: inserted.id, timestamp: Date.now(), scenario: scenario || "Strategy Analysis", data, completedTasks: [] };
         setHistory(prev => [finalItem, ...prev]);
       } else {
-        // Guest mode generation
-        finalItem = {
-          id: 'temp-' + Date.now(),
-          timestamp: Date.now(),
-          scenario: scenario || "Guest Analysis",
-          data,
-          completedTasks: []
-        };
+        finalItem = { id: 'temp-' + Date.now(), timestamp: Date.now(), scenario: scenario || "Guest Analysis", data, completedTasks: [] };
       }
-
       setActiveReport(finalItem);
       setStatus(AppStatus.SUCCESS);
       setAttachments([]); 
     } catch (err: any) {
-      console.error("Generation Error:", err);
       if (err.message?.includes("Requested entity was not found")) {
-        setError("Your API key configuration needs reset. Opening selection...");
+        setError("API key refresh required.");
         // @ts-ignore
         await window.aistudio.openSelectKey();
         setStatus(AppStatus.IDLE);
         return;
       }
-      setError(err.message || "Failed to generate roadmap. Please try again.");
+      setError(err.message || "Failed to generate roadmap.");
       setStatus(AppStatus.ERROR);
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!requireAuth()) return;
-    const files = e.target.files;
-    if (files) {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64 = (reader.result as string).split(',')[1];
-          setAttachments(prev => [...prev, { data: base64, mimeType: file.type }]);
-        };
-        reader.readAsDataURL(file);
-      }
-    }
+  const startUpgrade = (tier: UserTier) => {
+    const amount = tier === UserTier.PRO ? '₹499' : '₹999';
+    setShowPricing(false);
+    setShowPayment({ plan: tier, amount });
   };
 
-  const handleCapture = (base64: string) => {
-    setAttachments(prev => [...prev, { data: base64, mimeType: 'image/jpeg' }]);
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleUpgrade = async () => {
-    if (!requireAuth()) return;
+  const finalizeUpgrade = async () => {
+    if (!showPayment) return;
     try {
       // @ts-ignore
       await window.aistudio.openSelectKey();
       const { data, error } = await supabase.auth.updateUser({
-        data: { tier: UserTier.PRO }
+        data: { tier: showPayment.plan }
       });
       if (error) throw error;
-      setUserTier(UserTier.PRO);
-      setShowPricing(false);
+      setUserTier(showPayment.plan);
+      setShowPayment(null);
     } catch (err: any) {
-      alert("Upgrade process interrupted: " + err.message);
+      alert("Upgrade process interrupted.");
     }
   };
 
@@ -191,10 +154,8 @@ const App: React.FC = () => {
     const newTasks = activeReport.completedTasks.includes(taskId) 
       ? activeReport.completedTasks.filter(id => id !== taskId) 
       : [...activeReport.completedTasks, taskId];
-    
     const updated = { ...activeReport, completedTasks: newTasks };
     setActiveReport(updated);
-    
     if (user && !activeReport.id.startsWith('temp-')) {
       setHistory(prev => prev.map(i => i.id === updated.id ? updated : i));
       await supabase.from('roadmaps').update({ completed_tasks: newTasks }).eq('id', activeReport.id);
@@ -207,15 +168,17 @@ const App: React.FC = () => {
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => setStatus(AppStatus.IDLE)}>
           <Logo className="w-8 h-8" hideText />
           <h1 className="font-black text-[#003078] tracking-tight">REGUFLOW</h1>
-          {userTier === UserTier.PRO && (
-            <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border border-amber-200 ml-2 animate-in fade-in zoom-in">PRO</span>
+          {userTier !== UserTier.FREE && (
+            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border ml-2 animate-in fade-in zoom-in ${userTier === UserTier.PREMIUM ? 'bg-slate-900 text-white border-slate-700' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+              {userTier}
+            </span>
           )}
         </div>
         <div className="flex items-center gap-4">
-          {user && userTier === UserTier.FREE && (
+          {user && userTier !== UserTier.PREMIUM && (
             <button 
               onClick={() => setShowPricing(true)}
-              className="text-amber-600 font-bold text-xs uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-full border border-amber-200 hover:bg-amber-100 transition-colors"
+              className="text-[#1d70b8] font-bold text-xs uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full border border-blue-200 hover:bg-blue-100 transition-colors"
             >
               Upgrade
             </button>
@@ -236,125 +199,60 @@ const App: React.FC = () => {
       {status === AppStatus.IDLE && (
         <div className="flex-grow flex flex-col items-center justify-center p-6 text-center max-w-4xl mx-auto">
           <div className="mb-10 animate-in slide-in-from-top-4 duration-700">
-            <h2 className="text-5xl font-black text-[#003078] mb-4 tracking-tight leading-tight">Universal Business Strategy for India</h2>
-            <p className="text-slate-500 font-medium text-lg max-w-2xl mx-auto">From tea stalls to tech unicorns. Get instant regulatory & operational roadmaps.</p>
+            <h2 className="text-5xl font-black text-[#003078] mb-4 tracking-tight leading-tight">Universal Strategy Engine</h2>
+            <p className="text-slate-500 font-medium text-lg max-w-2xl mx-auto">Instant roadmaps powered by contextual intelligence. For every shop, startup, and conglomerate.</p>
           </div>
           
           <div className="w-full max-w-2xl bg-white p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 relative group transition-all hover:shadow-3xl">
             <form onSubmit={handleGenerate}>
               <textarea 
                 className="w-full h-40 p-6 bg-slate-50 border border-slate-200 rounded-t-2xl focus:outline-none text-slate-700 font-medium placeholder:text-slate-300 resize-none transition-all"
-                placeholder="Describe your business idea (e.g. 'Opening a specialized organic tea bar in Pune' or 'Structuring an AI SaaS with global clients')..."
+                placeholder="Ask anything... (e.g. 'Opening a chai stall in Bangalore' or 'Starting an NFT exchange in Mumbai')"
                 value={scenario}
                 onChange={(e) => setScenario(e.target.value)}
               />
-              
               <div className="bg-slate-50 border-x border-b border-slate-200 rounded-b-2xl p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      if (requireAuth()) fileInputRef.current?.click();
-                    }}
-                    className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-[#1d70b8] hover:border-[#1d70b8] transition-all"
-                    title="Upload Files"
-                  >
-                    📎
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      if (requireAuth()) setShowCamera(true);
-                    }}
-                    className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-[#1d70b8] hover:border-[#1d70b8] transition-all"
-                    title="Capture Photo"
-                  >
-                    📷
-                  </button>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    multiple 
-                    onChange={handleFileUpload}
-                  />
+                  <button type="button" onClick={() => {if(requireAuth()) fileInputRef.current?.click()}} className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-[#1d70b8] transition-all">📎</button>
+                  <button type="button" onClick={() => {if(requireAuth()) setShowCamera(true)}} className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-[#1d70b8] transition-all">📷</button>
+                  <input type="file" ref={fileInputRef} className="hidden" multiple onChange={(e) => {
+                    if (e.target.files) {
+                      for (let i = 0; i < e.target.files.length; i++) {
+                        const file = e.target.files[i];
+                        const reader = new FileReader();
+                        reader.onloadend = () => setAttachments(prev => [...prev, { data: (reader.result as string).split(',')[1], mimeType: file.type }]);
+                        reader.readAsDataURL(file);
+                      }
+                    }
+                  }} />
                 </div>
-                
                 <button className="gradient-bg text-white font-black px-8 py-3 rounded-xl shadow-lg hover:opacity-95 transition-all text-sm flex items-center justify-center gap-2 group/btn">
-                  Build Protocol
+                  Analyze Query
                   <svg className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                 </button>
               </div>
 
               {attachments.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-3 animate-in fade-in slide-in-from-top-2">
+                <div className="mt-4 flex flex-wrap gap-3 animate-in fade-in">
                   {attachments.map((att, i) => (
-                    <div key={i} className="relative group/att w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shadow-sm">
-                      {att.mimeType.startsWith('image/') ? (
-                        <img src={`data:${att.mimeType};base64,${att.data}`} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-slate-100 flex items-center justify-center text-[10px] font-black uppercase text-slate-400">DOC</div>
-                      )}
-                      <button 
-                        type="button"
-                        onClick={() => removeAttachment(i)}
-                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center text-[8px] opacity-0 group-hover/att:opacity-100 transition-opacity"
-                      >
-                        ✕
-                      </button>
+                    <div key={i} className="relative group/att w-16 h-16 rounded-lg overflow-hidden border border-slate-200">
+                      {att.mimeType.startsWith('image/') ? <img src={`data:${att.mimeType};base64,${att.data}`} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-100 flex items-center justify-center text-[8px] font-black">DOC</div>}
+                      <button type="button" onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))} className="absolute top-1 right-1 w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[6px] opacity-0 group-hover/att:opacity-100 transition-opacity">✕</button>
                     </div>
                   ))}
                 </div>
               )}
             </form>
-            <p className="mt-6 text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center">
-              Unlimited High-Speed Reasoning {userTier === UserTier.PRO ? "(Pro Mode)" : ""}
-            </p>
-          </div>
-
-          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6 text-left w-full max-w-4xl animate-in fade-in duration-1000 delay-300">
-             {[
-               { icon: "🏪", title: "Micro-Business Support", desc: "Detailed steps for shops, stalls, and solo-ventures." },
-               { icon: "🛡️", title: "Risk Mitigation", desc: "Identify tax liabilities and licensing hurdles instantly." },
-               { icon: "✨", title: "Unlimited Thinking", desc: "No tokens limits or generation caps on the Free tier." }
-             ].map((f, i) => (
-               <div key={i} className="p-6 rounded-2xl border border-slate-100 bg-white/50 hover:bg-white hover:shadow-md transition-all">
-                 <span className="text-2xl mb-2 block">{f.icon}</span>
-                 <h4 className="font-bold text-slate-800 text-sm mb-1">{f.title}</h4>
-                 <p className="text-xs text-slate-500 leading-relaxed font-medium">{f.desc}</p>
-               </div>
-             ))}
           </div>
         </div>
       )}
 
       {status === AppStatus.LOADING && (
-        <div className="flex-grow flex flex-col items-center justify-center space-y-8 animate-in fade-in duration-500">
-          <div className="relative">
-            <div className="w-24 h-24 border-4 border-slate-100 border-t-[#1d70b8] rounded-full animate-spin"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Logo className="w-10 h-10 opacity-50" hideText />
-            </div>
-          </div>
+        <div className="flex-grow flex flex-col items-center justify-center space-y-8">
+          <div className="w-20 h-20 border-4 border-slate-100 border-t-[#1d70b8] rounded-full animate-spin"></div>
           <div className="text-center">
-            <p className="font-black text-[#003078] text-2xl animate-pulse tracking-tight">Synthesizing Strategy...</p>
-            <p className="text-slate-400 font-medium text-sm mt-2">Connecting Local State Laws & Regulatory Grids</p>
-          </div>
-        </div>
-      )}
-
-      {status === AppStatus.ERROR && (
-        <div className="flex-grow flex flex-col items-center justify-center p-6 text-center">
-          <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl border border-rose-100 max-w-md animate-in zoom-in duration-300">
-            <span className="text-5xl mb-6 block">⚠️</span>
-            <h3 className="text-2xl font-black text-slate-900 mb-2">Protocol Disruption</h3>
-            <p className="text-slate-500 font-medium mb-8 leading-relaxed">{error}</p>
-            <button 
-              onClick={() => setStatus(AppStatus.IDLE)}
-              className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-slate-800 transition-all"
-            >
-              Retry Protocol
-            </button>
+            <p className="font-black text-[#003078] text-2xl animate-pulse">Consulting Context History...</p>
+            <p className="text-slate-400 font-medium text-sm mt-2">Retrieving Regulatory Precision</p>
           </div>
         </div>
       )}
@@ -362,17 +260,12 @@ const App: React.FC = () => {
       {status === AppStatus.SUCCESS && activeReport && (
         <div className="flex-grow relative">
           {!user && (
-             <div className="bg-[#003078] text-white p-3 text-center text-xs font-bold animate-in slide-in-from-top duration-500 flex items-center justify-center gap-4">
-                <span>Sign in to save this roadmap to your Vault and track progress permanently.</span>
-                <button onClick={() => setShowAuthModal(true)} className="bg-white text-[#003078] px-4 py-1 rounded-full uppercase tracking-widest font-black">Secure Vault</button>
-             </div>
+            <div className="bg-[#003078] text-white p-3 text-center text-xs font-bold flex items-center justify-center gap-4">
+              <span>Sign in to save this permanently.</span>
+              <button onClick={() => setShowAuthModal(true)} className="bg-white text-[#003078] px-4 py-1 rounded-full uppercase tracking-widest font-black">Secure Vault</button>
+            </div>
           )}
-          <ComplianceReport 
-            data={activeReport.data} 
-            completedTaskIds={activeReport.completedTasks} 
-            onToggleTask={handleToggleTask}
-            isPro={userTier === UserTier.PRO}
-          />
+          <ComplianceReport data={activeReport.data} completedTaskIds={activeReport.completedTasks} onToggleTask={handleToggleTask} isPro={userTier !== UserTier.FREE} />
         </div>
       )}
 
@@ -382,37 +275,23 @@ const App: React.FC = () => {
           <aside className="relative w-96 bg-white h-full shadow-2xl p-8 overflow-y-auto animate-in slide-in-from-right duration-300">
             <div className="flex justify-between items-center mb-10">
               <h3 className="font-black uppercase tracking-widest text-sm text-slate-400">Roadmap Vault</h3>
-              <button onClick={() => setShowHistory(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:text-slate-900 transition-colors">✕</button>
+              <button onClick={() => setShowHistory(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-400">✕</button>
             </div>
-            {history.length === 0 ? (
-              <div className="text-center py-20">
-                <span className="text-4xl mb-4 block">📭</span>
-                <p className="text-slate-400 font-medium text-sm">Vault currently offline. Generate a roadmap to initiate storage.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {history.map(item => (
-                  <div 
-                    key={item.id} 
-                    onClick={() => { setActiveReport(item); setStatus(AppStatus.SUCCESS); setShowHistory(false); }} 
-                    className={`p-6 bg-slate-50 rounded-[1.8rem] cursor-pointer hover:border-[#1d70b8] border transition-all group ${activeReport?.id === item.id ? 'border-[#1d70b8] bg-blue-50/30' : 'border-transparent'}`}
-                  >
-                    <p className="text-sm font-bold text-slate-700 line-clamp-2 mb-3 group-hover:text-[#1d70b8] transition-colors">{item.scenario}</p>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{new Date(item.timestamp).toLocaleDateString()}</span>
-                      {item.data.isGrounded && <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter">Search Grounded</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="space-y-4">
+              {history.map(item => (
+                <div key={item.id} onClick={() => { setActiveReport(item); setStatus(AppStatus.SUCCESS); setShowHistory(false); }} className={`p-6 bg-slate-50 rounded-[1.8rem] cursor-pointer hover:border-[#1d70b8] border transition-all ${activeReport?.id === item.id ? 'border-[#1d70b8]' : 'border-transparent'}`}>
+                  <p className="text-sm font-bold text-slate-700 line-clamp-2">{item.scenario}</p>
+                </div>
+              ))}
+            </div>
           </aside>
         </div>
       )}
 
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} onShowLegal={setLegalView} />}
-      {showPricing && <SubscriptionModal onClose={() => setShowPricing(false)} onUpgrade={handleUpgrade} />}
-      {showCamera && <CameraCapture onCapture={handleCapture} onClose={() => setShowCamera(false)} />}
+      {showPricing && <SubscriptionModal onClose={() => setShowPricing(false)} onUpgrade={startUpgrade} />}
+      {showPayment && <PaymentGateway planName={showPayment.plan} amount={showPayment.amount} onSuccess={finalizeUpgrade} onCancel={() => setShowPayment(null)} />}
+      {showCamera && <CameraCapture onCapture={(b64) => setAttachments(prev => [...prev, { data: b64, mimeType: 'image/jpeg' }])} onClose={() => setShowCamera(false)} />}
       {legalView && <LegalOverlay page={legalView} onClose={() => setLegalView(null)} />}
     </div>
   );

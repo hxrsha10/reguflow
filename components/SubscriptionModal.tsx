@@ -1,65 +1,92 @@
 
 import React from 'react';
+import { UserTier } from '../types';
 
 interface SubscriptionModalProps {
   onClose: () => void;
-  onUpgrade: () => void;
+  onUpgrade: (tier: UserTier) => void;
 }
 
 export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ onClose, onUpgrade }) => {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={onClose}></div>
-      <div className="relative w-full max-w-lg bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-        <div className="p-10 text-center">
-          <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-6 shadow-sm">
-            💎
-          </div>
-          <h2 className="text-3xl font-black text-slate-900 mb-2">Upgrade to Pro</h2>
-          <p className="text-slate-500 font-medium mb-10">
-            The Free tier is unlimited, but Pro offers verified intelligence.
-          </p>
-
-          <div className="space-y-4 mb-8 text-left">
-            {[
-              { title: "Google Search Grounding", desc: "Verifies latest laws with live web search", icon: "🌐" },
-              { title: "Advanced Reasoning", desc: "Powered by Gemini 3 Pro engine", icon: "🧠" },
-              { title: "Vault Backup", desc: "Priority storage for high-volume roadmaps", icon: "📦" },
-              { title: "Expert Lead Matching", desc: "Connect directly with verified Indian CAs", icon: "🤝" }
-            ].map((feature, i) => (
-              <div key={i} className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                <span className="text-xl">{feature.icon}</span>
-                <div>
-                  <h4 className="font-bold text-slate-800 text-sm">{feature.title}</h4>
-                  <p className="text-xs text-slate-500">{feature.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="bg-[#003078] p-1 rounded-2xl mb-8">
-            <div className="bg-white rounded-xl p-4 flex justify-between items-center">
-              <div className="text-left">
-                <span className="block text-[10px] font-black uppercase text-slate-400">Professional Tier</span>
-                <span className="text-2xl font-black text-[#003078]">₹499 <span className="text-sm font-medium text-slate-400">/ month</span></span>
-              </div>
-              <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-lg text-xs font-bold">Best Value</span>
-            </div>
-          </div>
-
-          <button 
-            onClick={onUpgrade}
-            className="w-full gradient-bg text-white font-black py-4 rounded-2xl shadow-xl hover:opacity-95 transition-all mb-4 text-lg"
-          >
-            Upgrade & Activate Pro
-          </button>
+      <div className="relative w-full max-w-5xl bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 p-1">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-1 h-full">
           
-          <button 
-            onClick={onClose}
-            className="text-slate-400 font-bold text-sm hover:text-slate-600 transition-colors"
-          >
-            Stay on Free (Unlimited)
-          </button>
+          {/* FREE TIER */}
+          <div className="p-8 flex flex-col h-full bg-slate-50/50">
+            <div className="mb-8">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Basic</span>
+              <h3 className="text-2xl font-black text-slate-900">Free</h3>
+              <p className="text-xs text-slate-500 font-medium mt-1">Foundational business logic.</p>
+            </div>
+            <div className="flex-grow space-y-4 mb-10">
+              {['Unlimited Generations', 'Indian Regulatory Grid', 'Multi-modal Camera Input', 'Standard Response Speed'].map((f, i) => (
+                <div key={i} className="flex items-start gap-3 text-xs font-bold text-slate-600">
+                  <span className="text-emerald-500">✓</span> {f}
+                </div>
+              ))}
+            </div>
+            <button 
+              onClick={onClose}
+              className="w-full py-4 border-2 border-slate-200 text-slate-400 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-100 transition-all"
+            >
+              Current Plan
+            </button>
+          </div>
+
+          {/* PRO TIER */}
+          <div className="p-8 flex flex-col h-full bg-white relative shadow-xl z-10 scale-105 border border-slate-100 rounded-3xl">
+            <div className="absolute top-4 right-4 bg-amber-100 text-amber-600 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">Popular</div>
+            <div className="mb-8">
+              <span className="text-[10px] font-black uppercase tracking-widest text-[#1d70b8]">Scaling</span>
+              <h3 className="text-2xl font-black text-slate-900">Pro</h3>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-2xl font-black">₹499</span>
+                <span className="text-xs text-slate-400">/mo</span>
+              </div>
+            </div>
+            <div className="flex-grow space-y-4 mb-10">
+              {['Everything in Free', 'Google Search Grounding', 'Permanent Vault Storage', 'Priority AI Reasoning', 'Verified CA Network Access'].map((f, i) => (
+                <div key={i} className="flex items-start gap-3 text-xs font-bold text-slate-700">
+                  <span className="text-[#1d70b8]">✓</span> {f}
+                </div>
+              ))}
+            </div>
+            <button 
+              onClick={() => onUpgrade(UserTier.PRO)}
+              className="w-full py-4 gradient-bg text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg hover:opacity-90 active:scale-95 transition-all"
+            >
+              Get Started
+            </button>
+          </div>
+
+          {/* PREMIUM TIER */}
+          <div className="p-8 flex flex-col h-full bg-slate-900 text-white">
+            <div className="mb-8">
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Enterprise</span>
+              <h3 className="text-2xl font-black">Premium</h3>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-2xl font-black">₹999</span>
+                <span className="text-xs opacity-40">/mo</span>
+              </div>
+            </div>
+            <div className="flex-grow space-y-4 mb-10">
+              {['Everything in Pro', 'Multi-State Law Comparison', 'Section-wise Audit Details', 'Direct Compliance Channel', '24/7 Priority Shield'].map((f, i) => (
+                <div key={i} className="flex items-start gap-3 text-xs font-bold opacity-80">
+                  <span className="text-[#1d70b8]">✓</span> {f}
+                </div>
+              ))}
+            </div>
+            <button 
+              onClick={() => onUpgrade(UserTier.PREMIUM)}
+              className="w-full py-4 bg-white text-slate-900 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-100 transition-all"
+            >
+              Go Premium
+            </button>
+          </div>
+
         </div>
       </div>
     </div>

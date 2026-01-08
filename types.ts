@@ -31,7 +31,8 @@ export interface HistoryItem {
 
 export enum UserTier {
   FREE = 'FREE',
-  PRO = 'PRO'
+  PRO = 'PRO',
+  PREMIUM = 'PREMIUM'
 }
 
 export enum AppStatus {

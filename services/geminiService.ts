@@ -3,16 +3,17 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ComplianceData } from "../types";
 
 const SYSTEM_INSTRUCTION = `
-Role: Universal Compliance & Startup Strategy Assistant (India)
-Purpose: Transform ANY Indian business or startup query into a structured operational roadmap.
-Scope: 
-- Handle minor business queries: Opening a small shop, tea stall, freelance consultancy, or home-based business.
-- Handle complex startup queries: NBFCs, Fintech, Drone tech, E-commerce, Foreign direct investment (FDI), and SEZ setups.
-- Tone: Professional, highly encouraging, and operational.
-- Localization: Always consider state-specific rules (e.g., Shop & Establishment Act variations across Maharashtra, Karnataka, etc.) and central mandates (GST, MCA, RBI).
+Role: Global Business Strategist & Compliance Architect (India)
+Purpose: Transform ANY business query into a high-fidelity roadmap. 
 
-Multi-modal: Analyze provided images (licenses, premises, forms) to verify compliance status.
-Output: MUST be a valid JSON object matching the provided schema. No conversational filler outside the JSON.
+Personalization Rule: You will be provided with "User Context/History". If the current query relates to previous searches, improve your response by building upon past context (e.g., comparing cities, scaling existing models).
+
+Scope: 
+- Minor: Home-based businesses, micro-consultancies, small retail.
+- Major: Unicorn startups, NBFCs, cross-border e-commerce, manufacturing.
+- Premium Features: If tier is PREMIUM, provide 50% more detail in 'riskFlags' and 'monitoringSuggestions', including specific section numbers of Indian Acts.
+
+Output: Valid JSON only.
 `;
 
 const responseSchema = {
@@ -50,24 +51,33 @@ export interface Attachment {
 
 export const getComplianceReport = async (
   scenario: string, 
-  isPro: boolean = false, 
-  attachments: Attachment[] = []
+  tier: string = 'FREE', 
+  attachments: Attachment[] = [],
+  history: string[] = []
 ): Promise<ComplianceData> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  const isPro = tier === 'PRO' || tier === 'PREMIUM';
+  const isPremium = tier === 'PREMIUM';
+  
+  // Use pro model for paid tiers, flash for free
   const modelName = isPro ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
 
+  const contextPrompt = history.length > 0 
+    ? `USER HISTORY CONTEXT: ${history.join(" | ")}. CURRENT QUERY: ${scenario}.`
+    : scenario;
+
   const config: any = {
-    systemInstruction: SYSTEM_INSTRUCTION,
+    systemInstruction: `${SYSTEM_INSTRUCTION}\nUser Tier: ${tier}\n${isPremium ? 'PROVIDE MAXIMUM DETAIL FOR PREMIUM USER.' : ''}`,
     responseMimeType: "application/json",
     responseSchema: responseSchema,
-    temperature: 0.1
+    temperature: 0.2
   };
 
   if (isPro) {
     config.tools = [{ googleSearch: {} }];
   }
 
-  const parts: any[] = [{ text: scenario }];
+  const parts: any[] = [{ text: contextPrompt }];
   attachments.forEach(att => {
     parts.push({
       inlineData: {
@@ -91,8 +101,7 @@ export const getComplianceReport = async (
     const cleanJson = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
     parsed = JSON.parse(cleanJson) as ComplianceData;
   } catch (e) {
-    console.error("JSON Parsing Error:", textOutput);
-    throw new Error("Formatting error. Please simplify your scenario.");
+    throw new Error("Formatting error. AI response could not be parsed.");
   }
   
   if (isPro && response.candidates?.[0]?.groundingMetadata?.groundingChunks) {
